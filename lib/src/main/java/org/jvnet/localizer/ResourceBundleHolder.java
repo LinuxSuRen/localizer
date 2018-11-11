@@ -104,25 +104,35 @@ public final class ResourceBundleHolder implements Serializable {
             Locale next = getBaseLocale(locale);
 
             String s = locale.toString();
-            URL res = owner.getResource(owner.getSimpleName()+(s.length()>0?'_'+s:"")+".properties");
-            if(res!=null) {
-                // found property file for this locale.
-                try {
-                    URLConnection uc = res.openConnection();
-                    uc.setUseCaches(false);
-                    InputStream is = uc.getInputStream();
-                    ResourceBundleImpl bundle = new ResourceBundleImpl(is);
-                    is.close();
-                    rb = bundle;
-                    if(next!=null)
-                    bundle.setParent(get(next));
-                    bundles.put(locale,bundle);
-                } catch (IOException e) {
-                    MissingResourceException x = new MissingResourceException("Unable to load resource " + res, owner.getName(), null);
-                    x.initCause(e);
-                    throw x;
+            boolean noRes = true;
+            try {
+                Enumeration<URL> resEnum = owner.getClassLoader().getResources(owner.getSimpleName() + (s.length() > 0 ? '_' + s : "") + ".properties");
+                while(resEnum.hasMoreElements()) {
+                    URL res = resEnum.nextElement();
+                    // found property file for this locale.
+                    try {
+                        URLConnection uc = res.openConnection();
+                        uc.setUseCaches(false);
+                        InputStream is = uc.getInputStream();
+                        ResourceBundleImpl bundle = new ResourceBundleImpl(is);
+                        is.close();
+                        rb = bundle;
+                        if(next!=null)
+                            bundle.setParent(get(next));
+                        bundles.put(locale,bundle);
+                    } catch (IOException e) {
+                        MissingResourceException x = new MissingResourceException("Unable to load resource " + res, owner.getName(), null);
+                        x.initCause(e);
+                        throw x;
+                    }
+
+                    noRes = false;
                 }
-            } else {
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if(noRes) {
                 if(next!=null)
                     // no matching resource, so just use the locale for the base
                     bundles.put(locale,rb=get(next));
